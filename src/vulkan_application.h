@@ -15,6 +15,7 @@
 class VulkanApplication {
     public:
     void Run();
+    void DrawFrame();
 
 private:
     struct SwapChainSupportDetails {
@@ -40,6 +41,14 @@ private:
     void SetupDebugMessenger();
     bool CheckDeviceExtensionSupport(VkPhysicalDevice device);
     SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device);
+    void CreateImageViews();
+    void CreateGraphicsPipeline();
+    VkShaderModule CreateShaderModule(const std::vector<char>& code);
+    void CreateRenderPass();
+    void CreateFramebuffers();
+    void CreateCommandPool();
+    void CreateCommandBuffers();
+    void CreateSemaphores();
 
     HWND window_ = nullptr;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -52,6 +61,21 @@ private:
     VkSurfaceKHR surface_ = VK_NULL_HANDLE;
     VkQueue presentQueue_ = VK_NULL_HANDLE;
     VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
+    std::vector<VkImage> swapChainImages;
+    VkFormat swapChainImageFormat;
+    VkExtent2D swapChainExtent;
+    std::vector<VkImageView> swapChainImageViews;
+    VkPipeline graphicsPipeline_ = VK_NULL_HANDLE;
+    VkRenderPass renderPass_ = VK_NULL_HANDLE;
+
+    VkPipelineLayout pipelineLayout_ = VK_NULL_HANDLE;
+    std::vector<VkFramebuffer> swapChainFramebuffers;
+    VkCommandPool commandPool_ = VK_NULL_HANDLE;
+    std::vector<VkCommandBuffer> commandBuffers_;
+
+    VkSemaphore imageAvailableSemaphore_;
+    VkSemaphore renderFinishedSemaphore_;
+
 
 };
 

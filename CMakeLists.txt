@@ -10,6 +10,7 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
         src/vulkan_application.cpp
         src/vulkan_application.h
+        src/util/util.cpp
 )
 
 if (WIN32)

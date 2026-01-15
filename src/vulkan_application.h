@@ -49,6 +49,17 @@ private:
     void CreateCommandPool();
     void CreateCommandBuffers();
     void CreateSemaphores();
+    void CreateVertexBuffer();
+    void CreateIndexBuffer();
+    void CreateDescriptorSetLayout();
+    void CreateUniformBuffer();
+    void UpdateUniformBuffer();
+    void CreateDescriptorPool();
+    void CreateDescriptorSet();
+
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) ;
+    void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+    void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
 
     HWND window_ = nullptr;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -76,6 +87,15 @@ private:
     VkSemaphore imageAvailableSemaphore_;
     VkSemaphore renderFinishedSemaphore_;
 
+    VkBuffer vertexBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory vertexBufferMemory_   = VK_NULL_HANDLE;
+    VkBuffer indexBuffer_;
+    VkDeviceMemory indexBufferMemory_;
+    VkDescriptorSetLayout descriptorSetLayout_= VK_NULL_HANDLE;
+    VkBuffer uniformBuffer_ = VK_NULL_HANDLE;
+    VkDeviceMemory uniformBufferMemory_ = VK_NULL_HANDLE;
+    VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
+    VkDescriptorSet descriptorSet_ = VK_NULL_HANDLE;
 
 };
 

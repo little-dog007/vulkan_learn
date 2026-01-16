@@ -14,10 +14,8 @@
 #include "util/util.h"
 #include <array>
 
-#define GLM_FORCE_RADIANS
-#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "util/tiny_obj_loader.h"
 
 #include <chrono>
 
@@ -82,12 +80,52 @@ void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &create
     createInfo.pfnUserCallback = debugCallback;
 }
 
+const int WIDTH = 800;
+const int HEIGHT = 600;
+
+const std::string MODEL_PATH = "C:\\Users\\86043\\CodeBuddy\\20251231104451\\model\\chalet.obj";
+const std::string TEXTURE_PATH = "C:\\Users\\86043\\CodeBuddy\\20251231104451\\textures\\chalet.jpg";
+
 void VulkanApplication::Run() {
     InitWindow();
     InitVulkan();
     MainLoop();
     Cleanup();
 }
+
+void VulkanApplication::LoadModel() {
+    tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string err;
+
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials,nullptr, &err, MODEL_PATH.c_str())) {
+        throw std::runtime_error(err);
+    }
+
+    for (const auto& shape : shapes) {
+        for (const auto& index : shape.mesh.indices) {
+            Vertex vertex = {};
+
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+
+            vertex.texCoord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+
+            vertex.color = {1.0f, 1.0f, 1.0f};
+
+            vertices_.push_back(vertex);
+            indices_.push_back(indices_.size());
+        }
+    }
+}
+
 
 void VulkanApplication::CreateDescriptorPool() {
     std::array<VkDescriptorPoolSize, 2> poolSizes = {};
@@ -131,11 +169,12 @@ void VulkanApplication::InitWindow() {
     // 将以上所有赋值全部写入操作系统
     RegisterClass(&wndclass);
     // 在内存中创建窗口
-    window_ = CreateWindow("Main", "window", WS_OVERLAPPEDWINDOW, 100, 100, 500, 500, nullptr, nullptr, hInstance,
+    window_ = CreateWindow("Main", "window", WS_OVERLAPPEDWINDOW, 100, 100, WIDTH, HEIGHT, nullptr, nullptr, hInstance,
                            nullptr);
 }
 
 void VulkanApplication::InitVulkan() {
+    LoadModel();
     // 创建实例
     CreateInstance();
     // 设置调试消息器
@@ -213,8 +252,10 @@ void VulkanApplication::CreateImageViews() {
 
 void VulkanApplication::CreateTextureImage() {
     int texWidth, texHeight, texChannels;
-    stbi_uc *pixels = stbi_load("C:\\Users\\86043\\CodeBuddy\\20251231104451\\textures\\dawei.jpg", &texWidth,
-                                &texHeight, &texChannels, STBI_rgb_alpha);
+    stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+
+
+
     VkDeviceSize imageSize = texWidth * texHeight * 4;
 
     if (!pixels) {
@@ -523,6 +564,10 @@ void VulkanApplication::DrawFrame() {
     VkResult result = vkAcquireNextImageKHR(device_, swapchain_, UINT64_MAX, imageAvailableSemaphore_, VK_NULL_HANDLE,
                                             &imageIndex);
 
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("failed to acquire swap chain image!");
+    }
+
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -540,7 +585,7 @@ void VulkanApplication::DrawFrame() {
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     if (vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS) {
-        assert(false);
+        throw std::runtime_error("failed to submit draw command buffer!");
     }
 
     VkPresentInfoKHR presentInfo = {};
@@ -553,22 +598,31 @@ void VulkanApplication::DrawFrame() {
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr; // Optional
-    if (vkQueuePresentKHR(presentQueue_, &presentInfo) != VK_SUCCESS) {
-        assert(false);
+    
+    result = vkQueuePresentKHR(presentQueue_, &presentInfo);
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        throw std::runtime_error("failed to present swap chain image!");
     }
+
+    vkQueueWaitIdle(presentQueue_);
 }
 
 
 void VulkanApplication::MainLoop() {
     ShowWindow(window_, SW_SHOW);
-    // 消息循环
+    // 渲染循环
     MSG msg = {nullptr};
-    while (GetMessage(&msg, nullptr, 0, 0)) {
-        TranslateMessage(&msg);
-        // 将消息交给窗口处理函数来处理
-        DispatchMessage(&msg);
-        UpdateUniformBuffer();
-        DrawFrame();
+    while (true) {
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) {
+                break;
+            }
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        } else {
+            UpdateUniformBuffer();
+            DrawFrame();
+        }
     }
 }
 
@@ -685,60 +739,8 @@ VkShaderModule VulkanApplication::CreateShaderModule(const std::vector<char> &co
     return shaderModule;
 }
 
-struct Vertex {
-    glm::vec3 pos;
-    glm::vec3 color;
-    glm::vec2 texCoord;
 
 
-    static VkVertexInputBindingDescription getBindingDescription() {
-        VkVertexInputBindingDescription bindingDescription{};
-        bindingDescription.binding = 0;
-        bindingDescription.stride = sizeof(Vertex);
-        bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-        return bindingDescription;
-    }
-
-    static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions = {};
-
-        attributeDescriptions[0].binding = 0;
-        attributeDescriptions[0].location = 0;
-        attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[0].offset = offsetof(Vertex, pos);
-
-        attributeDescriptions[1].binding = 0;
-        attributeDescriptions[1].location = 1;
-        attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        attributeDescriptions[1].offset = offsetof(Vertex, color);
-
-        attributeDescriptions[2].binding = 0;
-        attributeDescriptions[2].location = 2;
-        attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-        attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
-
-        return attributeDescriptions;
-    }
-};
-
-const std::vector<Vertex> vertices = {
-
-
-    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-
-};
-const std::vector<uint16_t> indices = {
-    0, 1, 2, 2, 3, 0,
-    4, 5, 6, 6, 7, 4
-};
 
 struct UniformBufferObject {
     glm::mat4 model;
@@ -818,7 +820,7 @@ void VulkanApplication::CopyBufferToImage(VkBuffer buffer, VkImage image, uint32
 
 
 void VulkanApplication::CreateVertexBuffer() {
-    VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+    VkDeviceSize bufferSize = sizeof(vertices_[0]) * vertices_.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -828,7 +830,7 @@ void VulkanApplication::CreateVertexBuffer() {
 
     void *data;
     vkMapMemory(device_, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, vertices.data(), (size_t) bufferSize);
+    memcpy(data, vertices_.data(), (size_t) bufferSize);
     vkUnmapMemory(device_, stagingBufferMemory);
 
     CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
@@ -839,7 +841,7 @@ void VulkanApplication::CreateVertexBuffer() {
 }
 
 void VulkanApplication::CreateIndexBuffer() {
-    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    VkDeviceSize bufferSize = sizeof(indices_[0]) * indices_.size();
 
     VkBuffer stagingBuffer;
     VkDeviceMemory stagingBufferMemory;
@@ -849,7 +851,7 @@ void VulkanApplication::CreateIndexBuffer() {
 
     void *data;
     vkMapMemory(device_, stagingBufferMemory, 0, bufferSize, 0, &data);
-    memcpy(data, indices.data(), (size_t) bufferSize);
+    memcpy(data, indices_.data(), (size_t) bufferSize);
     vkUnmapMemory(device_, stagingBufferMemory);
 
     CreateBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
@@ -1202,16 +1204,13 @@ void VulkanApplication::CreateCommandBuffers() {
         clearValues[1].depthStencil = {1.0f, 0};
 
         VkRenderPassBeginInfo renderPassInfo = {};
-        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-        renderPassInfo.pClearValues = clearValues.data();
         renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
         renderPassInfo.renderPass = renderPass_;
         renderPassInfo.framebuffer = swapChainFramebuffers[i];
         renderPassInfo.renderArea.offset = {0, 0};
         renderPassInfo.renderArea.extent = swapChainExtent;
-        VkClearValue clearColor = {0.0f, 0.0f, 0.0f, 1.0f};
-        renderPassInfo.clearValueCount = 1;
-        renderPassInfo.pClearValues = &clearColor;
+        renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+        renderPassInfo.pClearValues = clearValues.data();
 
         vkCmdBeginRenderPass(commandBuffers_[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -1220,11 +1219,11 @@ void VulkanApplication::CreateCommandBuffers() {
         VkBuffer vertexBuffers[] = {vertexBuffer_};
         VkDeviceSize offsets[] = {0};
         vkCmdBindVertexBuffers(commandBuffers_[i], 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(commandBuffers_[i], indexBuffer_, 0, VK_INDEX_TYPE_UINT16);
+        vkCmdBindIndexBuffer(commandBuffers_[i], indexBuffer_, 0, VK_INDEX_TYPE_UINT32);
 
 
         // vkCmdDraw(commandBuffers_[i], static_cast<uint32_t>(vertices.size()), 1, 0, 0);
-        vkCmdDrawIndexed(commandBuffers_[i], static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+        vkCmdDrawIndexed(commandBuffers_[i], static_cast<uint32_t>(indices_.size()), 1, 0, 0, 0);
 
 
         vkCmdEndRenderPass(commandBuffers_[i]);
@@ -1280,7 +1279,6 @@ void VulkanApplication::UpdateUniformBuffer() {
     float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
     UniformBufferObject ubo = {};
     ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float) swapChainExtent.height, 0.1f,
                                 10.0f);

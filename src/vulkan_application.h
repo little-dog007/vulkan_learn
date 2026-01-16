@@ -71,8 +71,11 @@ private:
     void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void CreateTextureImageView();
-    VkImageView CreateImageView(VkImage image, VkFormat format);
+    VkImageView CreateImageView(VkImage image, VkFormat format,VkImageAspectFlags aspectFlags=VK_IMAGE_ASPECT_COLOR_BIT);
     void CreateTextureSampler();
+    void CreateDepthResources();
+    VkFormat FindSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+    VkFormat FindDepthFormat();
 
     HWND window_ = nullptr;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -113,6 +116,9 @@ private:
     VkDeviceMemory textureImageMemory_ = VK_NULL_HANDLE;
     VkImageView textureImageView_ = VK_NULL_HANDLE;
     VkSampler textureSampler_ = VK_NULL_HANDLE;
+    VkImage depthImage_ = VK_NULL_HANDLE;
+    VkDeviceMemory depthImageMemory_ = VK_NULL_HANDLE;
+    VkImageView depthImageView_ = VK_NULL_HANDLE;
 
 };
 

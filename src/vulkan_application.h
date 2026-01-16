@@ -56,10 +56,23 @@ private:
     void UpdateUniformBuffer();
     void CreateDescriptorPool();
     void CreateDescriptorSet();
+    void CreateTextureImage();
+    VkCommandBuffer BeginSingleTimeCommands();
+    void EndSingleTimeCommands(VkCommandBuffer commandBuffer);
+
+    void TransitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void CopyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
+
+    void CreateImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& imageMemory);
+
 
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) ;
     void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    void CreateTextureImageView();
+    VkImageView CreateImageView(VkImage image, VkFormat format);
+    void CreateTextureSampler();
 
     HWND window_ = nullptr;
     VkInstance instance_ = VK_NULL_HANDLE;
@@ -96,6 +109,10 @@ private:
     VkDeviceMemory uniformBufferMemory_ = VK_NULL_HANDLE;
     VkDescriptorPool descriptorPool_ = VK_NULL_HANDLE;
     VkDescriptorSet descriptorSet_ = VK_NULL_HANDLE;
+    VkImage textureImage_ = VK_NULL_HANDLE;
+    VkDeviceMemory textureImageMemory_ = VK_NULL_HANDLE;
+    VkImageView textureImageView_ = VK_NULL_HANDLE;
+    VkSampler textureSampler_ = VK_NULL_HANDLE;
 
 };
 
